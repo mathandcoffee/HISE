@@ -238,7 +238,7 @@ StereoChannelData SampleLoader::fillVoiceBuffer(hlac::HiseSampleBuffer &voiceBuf
 		}
 
 		const int indexBeforeWrap = jmax<int>(0, (int)(readIndexDouble));
-		const int numSamplesInFirstBuffer = localReadBuffer->getNumSamples() - indexBeforeWrap;
+		const int numSamplesInFirstBuffer = jmax<int>(0, localReadBuffer->getNumSamples() - indexBeforeWrap);
 
 		voiceBuffer.setUseOneMap(localReadBuffer->useOneMap);
 
@@ -268,7 +268,7 @@ StereoChannelData SampleLoader::fillVoiceBuffer(hlac::HiseSampleBuffer &voiceBuf
             if(sound.get()->isLoopEnabled())
             {
                 auto offsetInLoop = localReadBuffer->getNumSamples() - sound.get()->getLoopEnd();
-                auto startInBuffer = sound.get()->getLoopStart() + offsetInLoop;
+                auto startInBuffer = jmin<int>(sound.get()->getLoopStart() + offsetInLoop, localReadBuffer->getNumSamples() - numSamplesToCopyFromSecondBuffer);
                 
                 hlac::HiseSampleBuffer::copy(voiceBuffer, *localReadBuffer, offset, startInBuffer, numSamplesToCopyFromSecondBuffer);
             }
