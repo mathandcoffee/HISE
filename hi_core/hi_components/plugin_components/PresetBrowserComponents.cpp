@@ -588,7 +588,6 @@ void PresetBrowserColumn::setNewRootDirectory(const File& newRootDirectory)
 	listModel->setRootDirectory(newRootDirectory);
 	listbox->deselectAllRows();
 	listbox->updateContent();
-	listbox->repaint();
 
 	updateButtonVisibility(parent->isReadOnly(newRootDirectory));
 }
