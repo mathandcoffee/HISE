@@ -922,7 +922,7 @@ void PresetBrowserColumn::ExpansionColumnModel::paintListBoxItem(int rowNumber, 
 int PresetBrowserColumn::ExpansionColumnModel::getNumRows() 
 {
 	entries.clear();
-
+    entries.add(File());
 	// We check for actual valid expansions to display here...
 	auto& h = getMainController()->getExpansionHandler();
 
