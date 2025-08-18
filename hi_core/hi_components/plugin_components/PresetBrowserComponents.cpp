@@ -802,30 +802,36 @@ void PresetBrowserColumn::timerCallback()
 
 void PresetBrowserColumn::setSelectedFile(const File& file, NotificationType notifyListeners)
 {
-	const int rowIndex = listModel->getIndexForFile(file);
+    int rowIndex = listModel->getIndexForFile(file);
+    bool shouldDeselect = true;
 
-	if (auto ec = dynamic_cast<ExpansionColumnModel*>(listModel.get()))
-			ec->setLastIndex(rowIndex);
+    if (auto ec = dynamic_cast<ExpansionColumnModel*>(listModel.get())) {
+        ec->setLastIndex(rowIndex);
+        if (rowIndex == 0) {
+            rowIndex = -1;
+            shouldDeselect = false;
+        }
+    }
 
-	selectedFile = file;
+    selectedFile = file;
 
-	if(rowIndex == -1)
-	{
-		listbox->deselectAllRows();
-		listbox->repaint();
-	}
-	else
-	{
-		SparseSet<int> s;
-		s.addRange(Range<int>(rowIndex, rowIndex + 1));
-		listbox->setSelectedRows(s, dontSendNotification);
-		listbox->repaint();
-	}
+    if(rowIndex == -1)
+    {
+        if (shouldDeselect) listbox->deselectAllRows();
+        listbox->repaint();
+    }
+    else
+    {
+        SparseSet<int> s;
+        s.addRange(Range<int>(rowIndex, rowIndex + 1));
+        listbox->setSelectedRows(s, dontSendNotification);
+        listbox->repaint();
+    }
 
-	if (notifyListeners == sendNotification)
-	{
-		listModel->sendRowChangeMessage(rowIndex);
-	}
+    if (notifyListeners == sendNotification)
+    {
+        listModel->sendRowChangeMessage(rowIndex);
+    }
 }
 
 
@@ -892,23 +898,25 @@ void PresetBrowserColumn::ExpansionColumnModel::listBoxItemClicked(int row, cons
 
 void PresetBrowserColumn::ExpansionColumnModel::paintListBoxItem(int rowNumber, Graphics &g, int width, int height, bool rowIsSelected)
 {
-	if (lastIndex == -1)
-		rowIsSelected = false;
+    if (lastIndex == -1)
+        rowIsSelected = false;
 
-	auto& h = getMainController()->getExpansionHandler();
+    auto& h = getMainController()->getExpansionHandler();
 
-	String itemName;
+    String itemName;
 
-	if (auto* e = h.getExpansion(rowNumber))
-	{
-		itemName = e->getProperty(ExpansionIds::Name);
-	}
-
-	if (rowNumber < entries.size())
-	{
-		auto position = Rectangle<int>(0, 1, width, height - 2);
-		getPresetBrowserLookAndFeel().drawListItem(g, *parent->getColumn(index), index, rowNumber, itemName, position, rowIsSelected, deleteOnClick, isMouseHover(rowNumber));
-	}
+    if (auto* e = h.getExpansion(rowNumber - 1))
+    {
+        itemName = e->getProperty(ExpansionIds::Name);
+    } else {
+        itemName = "0000 Factory Content";
+    }
+    
+    if (rowNumber < entries.size())
+    {
+        auto position = Rectangle<int>(0, 1, width, height - 2);
+        getPresetBrowserLookAndFeel().drawListItem(g, *parent->getColumn(index), index, rowNumber, itemName, position, rowIsSelected, deleteOnClick, isMouseHover(rowNumber));
+    }
 }
 
 int PresetBrowserColumn::ExpansionColumnModel::getNumRows() 

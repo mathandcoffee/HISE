@@ -1278,6 +1278,7 @@ struct ScriptingApi::Engine::Wrapper
 	API_METHOD_WRAPPER_2(Engine, performUndoAction);
 	API_METHOD_WRAPPER_0(Engine, getExtraDefinitionsInBackend);
 	API_METHOD_WRAPPER_0(Engine, loadAudioFilesIntoPool);
+    API_VOID_METHOD_WRAPPER_0(Engine, purgeAudioFilesFromPool);
 	API_VOID_METHOD_WRAPPER_1(Engine, loadImageIntoPool);
 	API_VOID_METHOD_WRAPPER_0(Engine, clearMidiFilePool);
 	API_VOID_METHOD_WRAPPER_0(Engine, clearSampleMapPool);
@@ -1429,6 +1430,7 @@ parentMidiProcessor(dynamic_cast<ScriptBaseMidiProcessor*>(p))
 	ADD_TYPED_API_METHOD_2(performUndoAction, VarTypeChecker::JSON, VarTypeChecker::Function);
 	ADD_API_METHOD_0(getExtraDefinitionsInBackend);
 	ADD_API_METHOD_0(loadAudioFilesIntoPool);
+    ADD_API_METHOD_0(purgeAudioFilesFromPool);
 	ADD_API_METHOD_0(clearMidiFilePool);
 	ADD_API_METHOD_0(clearSampleMapPool);
 	ADD_API_METHOD_2(getSampleFilesFromDirectory);
@@ -3339,6 +3341,20 @@ var ScriptingApi::Engine::loadAudioFileIntoBufferArray(String audioFileReference
 		reportScriptError("Can't load audio file " + ref.getReferenceString());
 		RETURN_IF_NO_THROW(var());
 	}
+}
+
+void ScriptingApi::Engine::purgeAudioFilesFromPool()
+{
+
+    HiseJavascriptEngine::TimeoutExtender xt(dynamic_cast<JavascriptProcessor*>(getScriptProcessor())->getScriptEngine());
+
+    auto pool = getScriptProcessor()->getMainController_()->getCurrentAudioSampleBufferPool();
+
+    pool->clearData();
+     
+    auto poolToLoad = getScriptProcessor()->getMainController_()->getSampleManager().getProjectHandler().pool.get();
+    
+    poolToLoad->clear();
 }
 
 juce::var ScriptingApi::Engine::getWavetableList()

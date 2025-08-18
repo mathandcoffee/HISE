@@ -509,6 +509,9 @@ public:
 
 		/** Calling this makes sure that all audio files are loaded into the pool and will be available in the compiled plugin. Returns a list of all references. */
 		var loadAudioFilesIntoPool();
+        
+        /** Calling this makes sure that all audio files are purged from the pool and will be unavailable to the compiled plugin. */
+        void purgeAudioFilesFromPool();
 
 		/** Loads a file and returns its content as array of Buffers. */
 		var loadAudioFileIntoBufferArray(String audioFileReference);
