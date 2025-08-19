@@ -3351,10 +3351,6 @@ void ScriptingApi::Engine::purgeAudioFilesFromPool()
     auto pool = getScriptProcessor()->getMainController_()->getCurrentAudioSampleBufferPool();
 
     pool->clearData();
-     
-    auto poolToLoad = getScriptProcessor()->getMainController_()->getSampleManager().getProjectHandler().pool.get();
-    
-    poolToLoad->clear();
 }
 
 juce::var ScriptingApi::Engine::getWavetableList()
