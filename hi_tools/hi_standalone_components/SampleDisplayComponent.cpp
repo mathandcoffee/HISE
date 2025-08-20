@@ -2744,16 +2744,13 @@ bool MultiChannelAudioBuffer::fromBase64String(const String& b64)
 					if (auto lr = provider->loadFile(referenceString))
 					{
 						originalBuffer = lr->buffer;
-						auto nb = createNewDataBuffer({ 0, originalBuffer.getNumSamples() });
-
-						referenceString = lr->reference;
 
 						{
 							SimpleReadWriteLock::ScopedWriteLock sl(getDataLock());
 							bufferRange = { 0, originalBuffer.getNumSamples() };
 							sampleRate = lr->sampleRate;
 							setLoopRange(lr->loopRange, dontSendNotification);
-							setDataBuffer(nb);
+							setDataBuffer(lr->buffer);
 						}
 
 						return true;
