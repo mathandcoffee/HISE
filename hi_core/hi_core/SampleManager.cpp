@@ -82,10 +82,10 @@ void MainController::SampleManager::setShouldSkipPreloading(bool skip)
 
 void MainController::SampleManager::preloadEverything()
 {
-    if(skipPreloading)
+    if(!skipPreloading)
         return;
 
-	skipPreloading = true;
+	skipPreloading = false;
 
 	LockHelpers::freeToGo(mc);
 
