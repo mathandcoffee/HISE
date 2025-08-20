@@ -622,8 +622,6 @@ bool ConvolutionEffectBase::reloadInternal()
 	const auto fullTailLength = jmax(headSize, nextPowerOfTwo(resampledLength - headSize));
 
 	MultithreadedConvolver::Ptr s1, s2;
-
-    
     
 	for (int c = 0; c < scratchBuffer.getNumChannels(); c++)
 	{
@@ -672,8 +670,8 @@ bool ConvolutionEffectBase::reloadInternal()
         
         if(convolverL != nullptr)
         {
-            backgroundThread.addConvolverToBeDeleted(convolverL);
-            backgroundThread.addConvolverToBeDeleted(convolverR);
+            convolverL.reset();
+            convolverR.reset();
         }
         
         convolverL = s1;
