@@ -270,7 +270,7 @@ juce::URL GlobalServer::getWithParameters(String subURL, var parameters)
 		for(const auto& v: d->getProperties())
 			isComplexObject |= v.value.isArray() || v.value.getDynamicObject() != nullptr;
 
-		if(isComplexObject)
+		if(true)
 		{
 			extraHeader = "Content-Type: application/json";
 			url = url.withPOSTData(JSON::toString(parameters, true));
