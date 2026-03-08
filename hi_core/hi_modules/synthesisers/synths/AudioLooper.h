@@ -92,6 +92,11 @@ public:
 
 	static ProcessorMetadata createMetadata();
 
+	enum SampleInterpolation
+	{
+		NearestNeighbor = 0,
+		numInterpolationModes
+	};
 	enum SpecialParameters
 	{
 		SyncMode = ModulatorSynth::numModulatorSynthParameters, 
@@ -100,8 +105,10 @@ public:
 		RootNote,
 		SampleStartMod,
 		Reversed,
+		InterpolationMode,
 		numLooperParameters
 	};
+	SampleInterpolation getInterpolationMode() const noexcept { return interpolationMode; }
 
 	AudioLooper(MainController *mc, const String &id, int numVoices);
 
@@ -154,6 +161,7 @@ private:
 	bool loopEnabled = false;
 	bool reversed = false;
 	bool pitchTrackingEnabled;
+	AudioLooper::SampleInterpolation interpolationMode = SampleInterpolation::NearestNeighbor;
 	int rootNote;
 
 	int sampleStartMod = 0;

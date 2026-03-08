@@ -30,8 +30,23 @@
 *   ===========================================================================
 */
 
+//Use includes here for custom code
+#include "AudioLooper.h"
+
 namespace hise { using namespace juce;
 
+SET_DOCUMENTATION(AudioLooper)
+{
+	SET_DOC_NAME(AudioLooper);
+
+	ADD_PARAMETER_DOC_WITH_NAME(SyncMode, "Sync Mode", "Syncs the looper to the host tempo");
+	ADD_PARAMETER_DOC_WITH_NAME(LoopEnabled, "Loop Enabled", "Enables looped playback");
+	ADD_PARAMETER_DOC_WITH_NAME(PitchTracking, "Pitch Tracking", "Repitches the sample based on the note and the root note.");
+	ADD_PARAMETER_DOC_WITH_NAME(RootNote, "Root Note", "Sets the root note when pitch tracking is enabled");
+	ADD_PARAMETER_DOC_WITH_NAME(SampleStartMod, "Sample Start modulation", "Modulates the sample start");
+	ADD_PARAMETER_DOC_WITH_NAME(Reversed, "Reversed", "Reverses the sample");
+	ADD_PARAMETER_DOC_WITH_NAME(InterpolationMode, "Interpolation Mode", "Sets the interpolation algorithm");
+}
 
 AudioLooperVoice::AudioLooperVoice(ModulatorSynth *ownerSynth) :
 ModulatorSynthVoice(ownerSynth),
@@ -236,10 +251,22 @@ void AudioLooperVoice::calculateBlock(int startSample, int numSamples)
 
 			const float leftNextSample = leftSamples[nextSamplePos];
 			const float rightNextSample = rightSamples[nextSamplePos];
-
-			const float leftSample = Interpolator::interpolateLinear(leftPrevSample, leftNextSample, (float)alpha);
-			const float rightSample = Interpolator::interpolateLinear(rightPrevSample, rightNextSample, (float)alpha);
-
+			
+			//declaring the variables
+			float leftSample, rightSample;
+			
+			//changing interpolation from constant to if else
+			if (looper->getInterpolationMode() == AudioLooper::SampleInterpolation::NearestNeighbor)
+			{
+				leftSample = leftPrevSample;
+				rightSample = rightPrevSample;
+			}
+			else
+			{
+				leftSample = Interpolator::interpolateLinear(leftPrevSample, leftNextSample, (float)alpha);
+				rightSample = Interpolator::interpolateLinear(rightPrevSample, rightNextSample, (float)alpha);
+			}
+			
 			//const float currentSample = invAlpha * v1 + alpha * v2;
 
 			// Stereo mode assumed
@@ -349,6 +376,16 @@ rootNote(64)
 	getBuffer().addListener(this);
 	finaliseModChains();
 
+	
+
+	parameterNames.add("SyncMode");
+	parameterNames.add("LoopEnabled");
+	parameterNames.add("PitchTracking");
+	parameterNames.add("RootNote");
+	parameterNames.add("SampleStartMod");
+	parameterNames.add("Reversed");
+	parameterNames.add("InterpolationMode");
+
 	updateParameterSlots();
 
 	inputMerger.setManualCountLimit(5);
@@ -378,6 +415,7 @@ void AudioLooper::restoreFromValueTree(const ValueTree &v)
 	loadAttribute(RootNote, "RootNote");
 	loadAttribute(SampleStartMod, "SampleStartMod");
 	loadAttribute(Reversed, "Reversed");
+	loadAttribute(InterpolationMode, "InterpolationMode");
 }
 
 ValueTree AudioLooper::exportAsValueTree() const
@@ -390,6 +428,7 @@ ValueTree AudioLooper::exportAsValueTree() const
 	saveAttribute(RootNote, "RootNote");
 	saveAttribute(SampleStartMod, "SampleStartMod");
 	saveAttribute(Reversed, "Reversed");
+	saveAttribute(InterpolationMode, "InterpolationMode");
 
 	AudioSampleProcessor::saveToValueTree(v);
 
@@ -408,7 +447,25 @@ float AudioLooper::getAttribute(int parameterIndex) const
 	case PitchTracking:	return pitchTrackingEnabled ? 1.0f : 0.0f;
 	case SampleStartMod: return (float)sampleStartMod;
 	case Reversed:		return reversed ? 1.0f : 0.0f;
+	case InterpolationMode:	return (float)((int)interpolationMode + 1);
 	default:					jassertfalse; return -1.0f;
+	}
+}
+
+float AudioLooper::getDefaultValue(int parameterIndex) const
+{
+	if (parameterIndex < ModulatorSynth::numModulatorSynthParameters) return ModulatorSynth::getDefaultValue(parameterIndex);
+
+	switch (parameterIndex)
+	{
+	case SyncMode:		return (float)(int)0;
+	case LoopEnabled:	return 1.0f;
+	case RootNote:		return 64.0f;
+	case PitchTracking:	return 0.0f;
+	case SampleStartMod: return 0.0f;
+	case Reversed:		return 0.0f;
+	case InterpolationMode:	return 0.0f;
+	default: jassertfalse; return -1.0f;
 	}
 }
 
@@ -429,6 +486,7 @@ void AudioLooper::setInternalAttribute(int parameterIndex, float newValue)
 	case PitchTracking:	pitchTrackingEnabled = newValue > 0.5f; break;
 	case SampleStartMod: sampleStartMod = jmax<int>(0, (int)newValue); break;
 	case Reversed:		reversed = newValue > 0.5f; break;
+	case InterpolationMode:	interpolationMode = (SampleInterpolation)((int)newValue - 1); break;
 	default:			jassertfalse; break;
 	}
 }
