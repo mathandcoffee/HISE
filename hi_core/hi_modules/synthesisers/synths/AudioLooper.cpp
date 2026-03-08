@@ -32,6 +32,7 @@
 
 //Use includes here for custom code
 #include "AudioLooper.h"
+#include "InterpolationTables.h"
 
 namespace hise { using namespace juce;
 
@@ -261,10 +262,99 @@ void AudioLooperVoice::calculateBlock(int startSample, int numSamples)
 				leftSample = leftPrevSample;
 				rightSample = rightPrevSample;
 			}
-			else
+			//Linear interpolation			
+			else if (looper->getInterpolationMode() == AudioLooper::SampleInterpolation::Linear)
 			{
 				leftSample = Interpolator::interpolateLinear(leftPrevSample, leftNextSample, (float)alpha);
 				rightSample = Interpolator::interpolateLinear(rightPrevSample, rightNextSample, (float)alpha);
+			}
+			
+			//SNES Gaussian (might not work)
+			else if (looper->getInterpolationMode() == AudioLooper::SampleInterpolation::SNESGaussian)
+			{
+				const int frac = (int)(alpha * 256.0);
+				
+				//basically identical to PS1
+				const int p0 = jlimit(0, buffer->getNumSamples() - 1, samplePos - 1);
+				const int p1 = jlimit(0, buffer->getNumSamples() - 1, samplePos); //this is the current sample position
+				const int p2 = jlimit(0, buffer->getNumSamples() - 1, nextSamplePos); //read one ahead
+				const int p3 = jlimit(0, buffer->getNumSamples() - 1, nextSamplePos + 1);
+				
+				//copy and paste from ps1, change to SNES
+				    const float c0 = (float)GAUSS_TABLE_SNES[0x0FF - frac];
+					const float c1 = (float)GAUSS_TABLE_SNES[0x1FF - frac];
+					const float c2 = (float)GAUSS_TABLE_SNES[0x100 + frac];
+					const float c3 = (float)GAUSS_TABLE_SNES[0x000 + frac];
+					
+				//do the thing, the math is different because the SPU and the SPC700 use different values
+				leftSample = (c0 * leftSamples[p0] +c1 * leftSamples[p1]
+							+ c2 * leftSamples[p2] +c3 * leftSamples[p3]) / 2048.0f;
+				rightSample = (c0 * rightSamples[p0] + c1 * rightSamples[p1]
+                 + c2 * rightSamples[p2] + c3 * rightSamples[p3]) / 2048.0f;
+			}		
+			//Standard cubic interpolation - similar to N64 but not technically 1:1 to its microcode
+			// this is just publicly available math
+			
+			
+			else if (looper->getInterpolationMode() == AudioLooper::SampleInterpolation::Cubic)
+			{
+				const float c0 = -0.5f * leftSamples[jlimit(0, buffer->getNumSamples() - 1, samplePos - 1)]
+                   + 1.5f * leftSamples[jlimit(0, buffer->getNumSamples() - 1, samplePos)]
+                   - 1.5f * leftSamples[jlimit(0, buffer->getNumSamples() - 1, nextSamplePos)]
+                   + 0.5f * leftSamples[jlimit(0, buffer->getNumSamples() - 1, nextSamplePos + 1)];
+				   
+				   const float c1 = leftSamples[jlimit(0, buffer->getNumSamples() - 1, samplePos - 1)]
+                   - 2.5f * leftSamples[jlimit(0, buffer->getNumSamples() - 1, samplePos)]
+                   + 2.0f * leftSamples[jlimit(0, buffer->getNumSamples() - 1, nextSamplePos)]
+                   - 0.5f * leftSamples[jlimit(0, buffer->getNumSamples() - 1, nextSamplePos + 1)];
+				   
+				   const float c2 = -0.5f * leftSamples[jlimit(0, buffer->getNumSamples() - 1, samplePos - 1)]
+                   + 0.5f * leftSamples[jlimit(0, buffer->getNumSamples() - 1, nextSamplePos)];
+				   
+				   const float c3 = leftSamples[jlimit(0, buffer->getNumSamples() - 1, samplePos)];
+
+					leftSample = ((c0 * (float)alpha + c1) * (float)alpha + c2) * (float)alpha + c3;
+					
+					const float d0 = -0.5f * rightSamples[jlimit(0, buffer->getNumSamples() - 1, samplePos - 1)]
+                   + 1.5f * rightSamples[jlimit(0, buffer->getNumSamples() - 1, samplePos)]
+                   - 1.5f * rightSamples[jlimit(0, buffer->getNumSamples() - 1, nextSamplePos)]
+                   + 0.5f * rightSamples[jlimit(0, buffer->getNumSamples() - 1, nextSamplePos + 1)];
+
+					const float d1 = rightSamples[jlimit(0, buffer->getNumSamples() - 1, samplePos - 1)]
+                   - 2.5f * rightSamples[jlimit(0, buffer->getNumSamples() - 1, samplePos)]
+                   + 2.0f * rightSamples[jlimit(0, buffer->getNumSamples() - 1, nextSamplePos)]
+                   - 0.5f * rightSamples[jlimit(0, buffer->getNumSamples() - 1, nextSamplePos + 1)];
+
+					const float d2 = -0.5f * rightSamples[jlimit(0, buffer->getNumSamples() - 1, samplePos - 1)]
+                   + 0.5f * rightSamples[jlimit(0, buffer->getNumSamples() - 1, nextSamplePos)];
+
+					const float d3 = rightSamples[jlimit(0, buffer->getNumSamples() - 1, samplePos)];
+
+					rightSample = ((d0 * (float)alpha + d1) * (float)alpha + d2) * (float)alpha + d3;
+			}
+			//Gaussian Interpolation attempt
+			else if (looper->getInterpolationMode() == AudioLooper::SampleInterpolation::PS1Gaussian)
+			{
+				// converting the number type
+				const int frac = (int)(alpha * 256.0);
+				
+				//get 4 surrounding sample values
+				const int p0 = jlimit(0, buffer->getNumSamples() - 1, samplePos - 1); //previous
+				const int p1 = jlimit(0, buffer->getNumSamples() - 1, samplePos); //current
+				const int p2 = jlimit(0, buffer->getNumSamples() - 1, nextSamplePos); // next
+				const int p3 = jlimit(0, buffer->getNumSamples() - 1, nextSamplePos +1); // 2 ahead
+				
+				//search the table
+				const float c0 = (float)GAUSS_TABLE_PS1[0xFF - frac];
+				const float c1 = (float)GAUSS_TABLE_PS1[0x1FF - frac];
+				const float c2 = (float)GAUSS_TABLE_PS1[0x100 + frac];
+				const float c3 = (float)GAUSS_TABLE_PS1[0x000 + frac];
+				
+				//blend the 4 samples using the table
+				leftSample  = (c0 * leftSamples[p0]  + c1 * leftSamples[p1]
+                 + c2 * leftSamples[p2]  + c3 * leftSamples[p3]) / 32768.0f;
+				rightSample = (c0 * rightSamples[p0] + c1 * rightSamples[p1]
+                 + c2 * rightSamples[p2] + c3 * rightSamples[p3]) / 32768.0f;
 			}
 			
 			//const float currentSample = invAlpha * v1 + alpha * v2;

@@ -32,6 +32,8 @@
 
 #ifndef AUDIOLOOPER_H_INCLUDED
 #define AUDIOLOOPER_H_INCLUDED
+#include "InterpolationTables.h"
+
 namespace hise { using namespace juce;
 
 class AudioLooper;
@@ -95,6 +97,10 @@ public:
 	enum SampleInterpolation
 	{
 		NearestNeighbor = 0,
+		Linear,
+		SNESGaussian,
+		Cubic,
+		PS1Gaussian,
 		numInterpolationModes
 	};
 	enum SpecialParameters
