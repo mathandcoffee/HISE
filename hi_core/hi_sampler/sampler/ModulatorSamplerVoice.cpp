@@ -39,6 +39,7 @@ void ModulatorSamplerVoice::startVoiceInternal(int midiNoteNumber, float velocit
 	auto sound = currentlyPlayingSamplerSound->getReferenceToSound();
 
 	wrappedVoice.setPitchFactor(midiNoteNumber, !sampler->isPitchTrackingEnabled() ? midiNoteNumber : currentlyPlayingSamplerSound->getRootNote(), sound.get(), getOwnerSynth()->getMainController()->getGlobalPitchFactor());
+	wrappedVoice.setInterpolationMode(sampler->getInterpolationMode());
 	wrappedVoice.setSampleStartModValue(startMod);
 	wrappedVoice.startNote(midiNoteNumber, velocity, sound.get(), -1);
 

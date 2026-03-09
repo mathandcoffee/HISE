@@ -30,6 +30,9 @@
 *   ===========================================================================
 */
 
+//Include the interpolation stuff!
+#include "../../hi_core/hi_modules/synthesisers/synths/InterpolationTables.h"
+
 namespace hise { using namespace juce;
 
 // =============================================================================================================================================== SampleLoader methods
@@ -788,7 +791,7 @@ template <typename SignalType, bool isFloat> void interpolateMonoSamples(const S
 	}
 }
 
-template <typename SignalType, bool isFloat> void interpolateStereoSamples(const SignalType* inL, const SignalType* inR, const float* pitchData, float* outL, float* outR, int startSample, double indexInBuffer, double uptimeDelta, int numSamples, int maxIndexInBuffer)
+template <typename SignalType, bool isFloat> void interpolateStereoSamples(const SignalType* inL, const SignalType* inR, const float* pitchData, float* outL, float* outR, int startSample, double indexInBuffer, double uptimeDelta, int numSamples, int maxIndexInBuffer, SampleInterpolation interpMode) //added interpolation
 {
 	constexpr float gainFactor = isFloat ? 1.0f : (1.0f / (float)INT16_MAX);
 
@@ -812,7 +815,8 @@ template <typename SignalType, bool isFloat> void interpolateStereoSamples(const
 			auto r1 = (float)inR[pos];
 			auto r2 = (float)inR[pos + 1];
 
-#if USE_CUBIC_INTERPOLATION
+//block commented in case i need it later - sfg
+/* #if USE_CUBIC_INTERPOLATION
 			auto l0 = (float)(pos > 0 ? inL[pos - 1] : 0);
 			auto l3 = (float)inL[pos + 2];
 			auto r0 = (float)(pos > 0 ? inR[pos - 1] : 0);
@@ -823,7 +827,69 @@ template <typename SignalType, bool isFloat> void interpolateStereoSamples(const
 #else
 			float l = Interpolator::interpolateLinear(l1, l2, alpha);
 			float r = Interpolator::interpolateLinear(r1, r2, alpha);
-#endif
+#endif */
+
+//
+
+//interpolation modes chain
+const int p0 = jmax(0, pos - 1); //fixed bad declaration
+const int p3 = jmin(pos + 2, maxIndexInBuffer);
+auto l0 = (float)inL[p0];
+auto l3 = (float)inL[p3];
+auto r0 = (float)inR[p0];
+auto r3 = (float)inR[p3];
+
+float l = l1;
+float r = r1;
+
+if (interpMode == NearestNeighbor)
+{
+    l = l1;
+    r = r1;
+}
+else if (interpMode == Linear)
+{
+    l = Interpolator::interpolateLinear(l1, l2, alpha);
+    r = Interpolator::interpolateLinear(r1, r2, alpha);
+}
+else if (interpMode == SNESGaussian)
+{
+    const int frac = jlimit(0, 255, (int)(alpha * 256.0f)); //had to add safe boundaries
+	const float c0 = (float)GAUSS_TABLE_SNES[(0x0FF - frac) & 0x1FF];
+	const float c1 = (float)GAUSS_TABLE_SNES[(0x1FF - frac) & 0x1FF];
+	const float c2 = (float)GAUSS_TABLE_SNES[(0x100 + frac) & 0x1FF];
+	const float c3 = (float)GAUSS_TABLE_SNES[(0x000 + frac) & 0x1FF];
+    l = (c0*l0 + c1*l1 + c2*l2 + c3*l3) / 2048.0f;
+    r = (c0*r0 + c1*r1 + c2*r2 + c3*r3) / 2048.0f;
+}
+else if (interpMode == Cubic)
+{ //had to put another type of Cubic here because HISE's only works on compile rather than stream
+    const int p0 = jmax(0, pos - 1);
+	const int p3 = jmin(pos + 2, maxIndexInBuffer);
+	const float t = alpha;
+	const float ls0 = (float)inL[p0], ls3 = (float)inL[p3];
+	const float rs0 = (float)inR[p0], rs3 = (float)inR[p3];
+	l = (-0.5f*ls0 + 1.5f*l1 - 1.5f*l2 + 0.5f*ls3)*t*t*t
+	+ (ls0 - 2.5f*l1 + 2.0f*l2 - 0.5f*ls3)*t*t
+	+ (-0.5f*ls0 + 0.5f*l2)*t + l1;
+	r = (-0.5f*rs0 + 1.5f*r1 - 1.5f*r2 + 0.5f*rs3)*t*t*t
+	+ (rs0 - 2.5f*r1 + 2.0f*r2 - 0.5f*rs3)*t*t
+	+ (-0.5f*rs0 + 0.5f*r2)*t + r1;
+}
+else
+{
+	const int frac = jlimit(0, 255, (int)(alpha * 256.0f)); //safe boundaries because HISE wants to do bigger math than we need 
+	const float c0 = (float)GAUSS_TABLE_PS1[(0x0FF - frac) & 0x1FF];
+	const float c1 = (float)GAUSS_TABLE_PS1[(0x1FF - frac) & 0x1FF];
+	const float c2 = (float)GAUSS_TABLE_PS1[(0x100 + frac) & 0x1FF];
+	const float c3 = (float)GAUSS_TABLE_PS1[(0x000 + frac) & 0x1FF];
+	
+    l = (c0*l0 + c1*l1 + c2*l2 + c3*l3) / 32768.0f;
+    r = (c0*r0 + c1*r1 + c2*r2 + c3*r3) / 32768.0f;
+}
+	
+	
+	
 
 			outL[i] = l * gainFactor;
 			outR[i] = r * gainFactor;
@@ -853,8 +919,8 @@ template <typename SignalType, bool isFloat> void interpolateStereoSamples(const
 			auto l2 = (float)inL[pos + 1];
 			auto r1 = (float)inR[pos];
 			auto r2 = (float)inR[pos + 1];
-			
-#if USE_CUBIC_INTERPOLATION
+//commented out in case i need to use it later - sfg			
+/* #if USE_CUBIC_INTERPOLATION
 			auto l0 = (float)(pos > 0 ? inL[pos - 1] : 0);
 			auto l3 = (float)inL[pos + 2];
 			auto r0 = (float)(pos > 0 ? inR[pos - 1] : 0);
@@ -865,7 +931,63 @@ template <typename SignalType, bool isFloat> void interpolateStereoSamples(const
 #else
 			float l = Interpolator::interpolateLinear(l1, l2, alpha);
 			float r = Interpolator::interpolateLinear(r1, r2, alpha);
-#endif
+#endif */
+
+//interpolation stuff
+const int p0 = jmax(0, pos - 1); //fixed wrong declaration
+const int p3 = jmin(pos + 2, maxIndexInBuffer);
+auto l0 = (float)inL[p0];
+auto l3 = (float)inL[p3];
+auto r0 = (float)inR[p0];
+auto r3 = (float)inR[p3];
+
+float l = l1;
+float r = r1;
+
+if (interpMode == NearestNeighbor)
+{
+    l = l1;
+    r = r1;
+}
+else if (interpMode == Linear)
+{
+    l = Interpolator::interpolateLinear(l1, l2, alpha);
+    r = Interpolator::interpolateLinear(r1, r2, alpha);
+}
+else if (interpMode == SNESGaussian)
+{
+    const int frac = jlimit(0, 255, (int)(alpha * 256.0f)); //smaller math dude
+	const float c0 = (float)GAUSS_TABLE_SNES[(0x0FF - frac) & 0x1FF];
+	const float c1 = (float)GAUSS_TABLE_SNES[(0x1FF - frac) & 0x1FF];
+	const float c2 = (float)GAUSS_TABLE_SNES[(0x100 + frac) & 0x1FF];
+	const float c3 = (float)GAUSS_TABLE_SNES[(0x000 + frac) & 0x1FF];
+    l = (c0*l0 + c1*l1 + c2*l2 + c3*l3) / 2048.0f;
+    r = (c0*r0 + c1*r1 + c2*r2 + c3*r3) / 2048.0f;
+}
+else if (interpMode == Cubic)
+{ //again, using sourced math because HISE can only do Cubic on compile rather than LIVE!
+    const int p0 = jmax(0, pos - 1);
+	const int p3 = jmin(pos + 2, maxIndexInBuffer);
+	const float t = alpha;
+	const float ls0 = (float)inL[p0], ls3 = (float)inL[p3];
+	const float rs0 = (float)inR[p0], rs3 = (float)inR[p3];
+	l = (-0.5f*ls0 + 1.5f*l1 - 1.5f*l2 + 0.5f*ls3)*t*t*t
+	+ (ls0 - 2.5f*l1 + 2.0f*l2 - 0.5f*ls3)*t*t
+	+ (-0.5f*ls0 + 0.5f*l2)*t + l1;
+	r = (-0.5f*rs0 + 1.5f*r1 - 1.5f*r2 + 0.5f*rs3)*t*t*t
+	+ (rs0 - 2.5f*r1 + 2.0f*r2 - 0.5f*rs3)*t*t
+	+ (-0.5f*rs0 + 0.5f*r2)*t + r1;
+}
+else
+{
+    const int frac = jlimit(0, 255, (int)(alpha * 256.0f)); //stop working so hard, it's just PS1
+	const float c0 = (float)GAUSS_TABLE_PS1[(0x0FF - frac) & 0x1FF];
+	const float c1 = (float)GAUSS_TABLE_PS1[(0x1FF - frac) & 0x1FF];
+	const float c2 = (float)GAUSS_TABLE_PS1[(0x100 + frac) & 0x1FF];
+	const float c3 = (float)GAUSS_TABLE_PS1[(0x000 + frac) & 0x1FF];
+    l = (c0*l0 + c1*l1 + c2*l2 + c3*l3) / 32768.0f;
+    r = (c0*r0 + c1*r1 + c2*r2 + c3*r3) / 32768.0f;
+}
 
 			*outL++ = l * gainFactor;
 			*outR++ = r * gainFactor;
@@ -887,7 +1009,7 @@ void StreamingSamplerVoice::interpolateFromStereoData(int startSample, float* ou
 		const float* const inL = static_cast<const float*>(data.b->getReadPointer(0, data.offsetInBuffer));
 		const float* const inR = static_cast<const float*>(data.b->getReadPointer(1, data.offsetInBuffer));
 
-		interpolateStereoSamples<float, true>(inL, inR, pitchDataToUse, outL, outR, startSample, indexInBuffer, thisUptimeDelta, numSamplesToCalculate, indexInBuffer + samplesAvailable);
+		interpolateStereoSamples<float, true>(inL, inR, pitchDataToUse, outL, outR, startSample, indexInBuffer, thisUptimeDelta, numSamplesToCalculate, indexInBuffer + samplesAvailable, interpolationMode); //interpolation added
 	}
 	else
 	{
@@ -911,7 +1033,7 @@ void StreamingSamplerVoice::interpolateFromStereoData(int startSample, float* ou
 
 				data.b->convertToFloatWithNormalisation(d, data.b->getNumChannels(), data.offsetInBuffer, numSamplesThisTime);
 
-				interpolateStereoSamples<float, true>(inL_f, inR_f, pitchDataToUse, outL, outR, startSample, indexInBuffer, thisUptimeDelta, numSamplesToCalculate, indexInBuffer + samplesAvailable);
+				interpolateStereoSamples<float, true>(inL_f, inR_f, pitchDataToUse, outL, outR, startSample, indexInBuffer, thisUptimeDelta, numSamplesToCalculate, indexInBuffer + samplesAvailable, interpolationMode); //interpolation added
 			}
 			else
 			{
@@ -924,7 +1046,7 @@ void StreamingSamplerVoice::interpolateFromStereoData(int startSample, float* ou
 		}
 		else
 		{
-			interpolateStereoSamples<int16, false>(inL, inR, pitchData, outL, outR, startSample, indexInBuffer, thisUptimeDelta, numSamplesToCalculate, indexInBuffer + samplesAvailable);
+			interpolateStereoSamples<int16, false>(inL, inR, pitchData, outL, outR, startSample, indexInBuffer, thisUptimeDelta, numSamplesToCalculate, indexInBuffer + samplesAvailable, interpolationMode);
 		}
 	}
 }

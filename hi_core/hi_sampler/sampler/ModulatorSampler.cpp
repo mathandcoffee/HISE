@@ -158,6 +158,21 @@ syncVoiceHandler(false)
 
 	//enableAllocationFreeMessages(50);
 
+	parameterNames.add("PreloadSize");
+	parameterNames.add("BufferSize");
+	parameterNames.add("VoiceAmount");
+	parameterNames.add("RRGroupAmount");
+	parameterNames.add("SamplerRepeatMode");
+	parameterNames.add("PitchTracking");
+	parameterNames.add("OneShot");
+	parameterNames.add("CrossfadeGroups");
+	parameterNames.add("Purged");
+	parameterNames.add("Reversed");
+    parameterNames.add("UseStaticMatrix");
+	parameterNames.add("LowPassEnvelopeOrder");
+	parameterNames.add("Timestretching");
+	parameterNames.add("InterpolationMode");
+
 	updateParameterSlots();
 
 	editorStateIdentifiers.add("SampleStartChainShown");
@@ -544,7 +559,9 @@ void ModulatorSampler::restoreFromValueTree(const ValueTree &v)
 
 	loadAttribute(SamplerRepeatMode, "SamplerRepeatMode");
 	loadAttribute(Purged, "Purged");
-
+	loadAttribute(Timestretching, "Timestretching");
+	loadAttribute(InterpolationMode, "InterpolationMode"); //interpolation settings load
+	
 	auto savedMap = v.getChildWithName("samplemap");
 
 	if (savedMap.isValid())
@@ -610,6 +627,8 @@ ValueTree ModulatorSampler::exportAsValueTree() const
     saveAttribute(UseStaticMatrix, "UseStaticMatrix");
 	saveAttribute(LowPassEnvelopeOrder, "LowPassEnvelopeOrder");
 
+	saveAttribute(Timestretching, "Timestretching"); //i had to add this everywhere because it's only half implemented?
+	saveAttribute(InterpolationMode, "InterpolationMode");
 	ValueTree channels("channels");
 
 	for (int i = 0; i < numChannels; i++)
@@ -695,6 +714,8 @@ float ModulatorSampler::getAttribute(int parameterIndex) const
 	case Reversed:			return reversed ? 1.0f : 0.0f;
     case UseStaticMatrix:   return useStaticMatrix ? 1.0f : 0.0f;
 	case LowPassEnvelopeOrder: return (float)lowPassOrder * 6.0f;
+	case Timestretching:	return 1.0f;
+	case InterpolationMode:	return (float)((int)interpolationMode + 1);
 	default:				jassertfalse; return -1.0f;
 	}
 }
@@ -730,6 +751,8 @@ void ModulatorSampler::setInternalAttribute(int parameterIndex, float newValue)
 		if (envelopeFilter != nullptr)
 			envelopeFilter->setOrder(lowPassOrder);
 		break;
+	case Timestretching:	break;
+	case InterpolationMode: interpolationMode = (SampleInterpolation)(jmax(0, (int)newValue - 1)); break; //these are all offset by 1 because UI combo box starts at 1 rather than 0
 	default:				jassertfalse; break;
 	}
 }

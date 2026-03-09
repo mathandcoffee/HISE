@@ -33,6 +33,8 @@
 #ifndef STREAMINGSAMPLERVOICE_H_INCLUDED
 #define STREAMINGSAMPLERVOICE_H_INCLUDED
 
+#include "../../hi_core/hi_core/SampleInterpolation.h"
+
 namespace hise { using namespace juce;
 
 class StreamingSamplerVoice;
@@ -276,6 +278,7 @@ public:
 	void stopNote(float, bool /*allowTailOff*/);;
 
 	void setDebugLogger(DebugLogger* newLogger);
+	void setInterpolationMode(SampleInterpolation mode) { interpolationMode = mode; } //public setter for interpolation mode
 
 	void interpolateFromStereoData(int startSample, float* outL, float* outR, int numSamplesToCalculate,
 	                               const float* pitchDataToUse, double thisUptimeDelta, double startAlpha,
@@ -426,6 +429,7 @@ private:
 
 	time_stretcher stretcher;
 	double stretchRatio = 1.0;
+	SampleInterpolation interpolationMode = SampleInterpolation::NearestNeighbor;
 
 	const float *pitchData;
 

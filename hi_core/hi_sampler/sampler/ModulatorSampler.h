@@ -30,6 +30,7 @@
 *   ===========================================================================
 */
 
+
 #ifndef MODULATORSAMPLER_H_INCLUDED
 #define MODULATORSAMPLER_H_INCLUDED
 
@@ -59,8 +60,11 @@ class ModulatorSampler: public ModulatorSynth,
 {
 public:
 
-
-
+	// Elezeid's interpolation stuff - commenting now because idk if it'll work
+	#include "../../hi_core/hi_core/SampleInterpolation.h"
+	
+	SampleInterpolation getInterpolationMode() const noexcept { return interpolationMode; } //doesnt change anything and wont throw a billion errors
+	
 	/** If you add or delete multiple samples at once (but not the entire sample set), it will
 	    fire an UI update for each sample drastically slowing down the UI responsiveness.
 		
@@ -221,6 +225,8 @@ public:
 		Reversed,
         UseStaticMatrix,
 		LowPassEnvelopeOrder,
+		Timestretching,
+		InterpolationMode,
 		numModulatorSamplerParameters
 	};
 
@@ -781,6 +787,9 @@ public:
 
 private:
 
+	//interpolation stuff
+	SampleInterpolation interpolationMode = SampleInterpolation::NearestNeighbor;
+	
 	scriptnode::PolyHandler syncVoiceHandler;
 	scriptnode::core::stretch_player<NUM_POLYPHONIC_VOICES>::tempo_syncer syncer;
 
