@@ -20,30 +20,7 @@
 
 // [END_USER_CODE_SECTION]
 
-/*
-  ==============================================================================
-
-   In accordance with the terms of the JUCE 6 End-Use License Agreement, the
-   JUCE Code in SECTION A cannot be removed, changed or otherwise rendered
-   ineffective unless you have a JUCE Indie or Pro license, or are using JUCE
-   under the GPL v3 license.
-
-   End User License Agreement: www.juce.com/juce-6-licence
-
-  ==============================================================================
-*/
-
-// BEGIN SECTION A
-
-#ifndef JUCE_DISPLAY_SPLASH_SCREEN
- #define JUCE_DISPLAY_SPLASH_SCREEN 0
-#endif
-
-// END SECTION A
-
-#define JUCE_USE_DARK_SPLASH_SCREEN 1
-
-#define JUCE_PROJUCER_VERSION 0x60104
+#define JUCE_PROJUCER_VERSION 0x8000c
 
 //==============================================================================
 #define JUCE_MODULE_AVAILABLE_hi_backend                          1
@@ -456,6 +433,10 @@
 
 #ifndef    HISE_INCLUDE_PITCH_DETECTION
  //#define HISE_INCLUDE_PITCH_DETECTION 1
+#endif
+
+#ifndef    HISE_INCLUDE_XSIMD
+ //#define HISE_INCLUDE_XSIMD 0
 #endif
 
 #ifndef    HISE_INCLUDE_RT_NEURAL
