@@ -314,14 +314,14 @@ RestServer::Response BackendProcessor::onAsyncRequest(RestServer::AsyncRequest::
 		case RestHelpers::ApiRoute::SetComponentProperties:
 			return RestHelpers::handleSetComponentProperties(this, req);
 			
-		case RestHelpers::ApiRoute::Screenshot:
-			return RestHelpers::handleScreenshot(this, req);
+		case RestHelpers::ApiRoute::TestingScreenshot:
+			return RestHelpers::handleTestingScreenshot(this, req);
 			
 		case RestHelpers::ApiRoute::GetSelectedComponents:
 			return RestHelpers::handleGetSelectedComponents(this, req);
 			
-		case RestHelpers::ApiRoute::SimulateInteractions:
-			return RestHelpers::handleSimulateInteractions(this, req);
+		case RestHelpers::ApiRoute::TestingE2e:
+			return RestHelpers::handleTestingE2e(this, req);
 			
 		case RestHelpers::ApiRoute::DiagnoseScript:
 			return RestHelpers::handleDiagnoseScript(this, req);
@@ -329,8 +329,8 @@ RestServer::Response BackendProcessor::onAsyncRequest(RestServer::AsyncRequest::
 		case RestHelpers::ApiRoute::GetIncludedFiles:
 			return RestHelpers::handleGetIncludedFiles(this, req);
 			
-		case RestHelpers::ApiRoute::StartProfiling:
-			return RestHelpers::handleStartProfiling(this, req);
+		case RestHelpers::ApiRoute::TestingProfile:
+			return RestHelpers::handleTestingProfile(this, req);
 			
 		case RestHelpers::ApiRoute::ParseCSS:
 			return RestHelpers::handleParseCSS(this, req);
@@ -383,6 +383,24 @@ RestServer::Response BackendProcessor::onAsyncRequest(RestServer::AsyncRequest::
 	case RestHelpers::ApiRoute::UIApply:
 		return RestHelpers::handleUIApply(this, req);
 
+	case RestHelpers::ApiRoute::TestingSequence:
+		return RestHelpers::handleTestingSequence(this, req);
+
+	case RestHelpers::ApiRoute::DspList:
+		return RestHelpers::handleDspList(this, req);
+
+	case RestHelpers::ApiRoute::DspInit:
+		return RestHelpers::handleDspInit(this, req);
+
+	case RestHelpers::ApiRoute::DspTree:
+		return RestHelpers::handleDspTree(this, req);
+
+	case RestHelpers::ApiRoute::DspApply:
+		return RestHelpers::handleDspApply(this, req);
+
+	case RestHelpers::ApiRoute::DspSave:
+		return RestHelpers::handleDspSave(this, req);
+
 	default:
 		return req->fail(404, "Unknown API endpoint: " + subURL);
 	}
@@ -394,14 +412,18 @@ void BackendProcessor::serverStarted(int port)
 	
 	// Create interaction tester when server starts
 	interactionTester = std::make_unique<InteractionTester>(this);
+
+	// Create MIDI injector when server starts
+	midiInjector = std::make_unique<MidiInjector>(this);
 }
 
 void BackendProcessor::serverStopped()
 {
 	debugToConsole(getMainSynthChain(), "REST API Server stopped");
 	
-	// Destroy interaction tester when server stops
+	// Destroy interaction tester and MIDI injector when server stops
 	interactionTester = nullptr;
+	midiInjector = nullptr;
 }
 
 void BackendProcessor::requestReceived(const String& method, const String& path)
@@ -421,7 +443,6 @@ BackendProcessor::BackendProcessor(AudioDeviceManager *deviceManager_/*=nullptr*
   AudioProcessorDriver(deviceManager_, callback_),
   scriptUnlocker(this),
   autosaver(this),
-  replServer(*this),
   pluginParameterRamp(this)
 {
 	// Register all REST API routes from the centralized metadata
@@ -501,16 +522,7 @@ if (!inUnitTestMode())
 	{
 		getAutoSaver().initialise();
 
-		if (BackendProcessor::isUsingCommandLineServerMode())
-		{
-			restServer.start(commandLineServerPort);
-		}
-		else if (getSettingsObject().getSetting(HiseSettings::Scripting::AutoStartRestServer).toString() == "Yes")
-		{
-			// Auto-start REST API server if enabled in settings
-			int port = (int)getSettingsObject().getSetting(HiseSettings::Scripting::RestApiPort);
-			restServer.start(port);
-		}
+		
 	}
 	
 	clearPreset(dontSendNotification);
@@ -633,6 +645,11 @@ BackendProcessor::~BackendProcessor()
 InteractionTester* BackendProcessor::getInteractionTester()
 {
 	return interactionTester.get();
+}
+
+MidiInjector* BackendProcessor::getMidiInjector()
+{
+	return midiInjector.get();
 }
 
 void BackendProcessor::showInteractionTestWindow()
@@ -1166,9 +1183,13 @@ void BackendProcessor::setEditorData(var editorState)
 	editorInformation = editorState;
 }
 
+hise::ControlledObject* BackendProcessor::getRestWizardRunner()
+{
+	if (wizardRunner == nullptr)
+		wizardRunner = new RestHelpers::WizardExecutor::AsyncRunner(this);
 
-
-
+	return wizardRunner.get();
+}
 
 void BackendProcessor::pushToAnalyserBuffer(AnalyserInfo::Ptr info, bool post, const AudioSampleBuffer& buffer, int numSamples)
 {
