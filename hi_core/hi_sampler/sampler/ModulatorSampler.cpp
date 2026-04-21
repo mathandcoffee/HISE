@@ -158,21 +158,6 @@ syncVoiceHandler(false)
 
 	//enableAllocationFreeMessages(50);
 
-	parameterNames.add("PreloadSize");
-	parameterNames.add("BufferSize");
-	parameterNames.add("VoiceAmount");
-	parameterNames.add("RRGroupAmount");
-	parameterNames.add("SamplerRepeatMode");
-	parameterNames.add("PitchTracking");
-	parameterNames.add("OneShot");
-	parameterNames.add("CrossfadeGroups");
-	parameterNames.add("Purged");
-	parameterNames.add("Reversed");
-    parameterNames.add("UseStaticMatrix");
-	parameterNames.add("LowPassEnvelopeOrder");
-	parameterNames.add("Timestretching");
-	parameterNames.add("InterpolationMode");
-
 	updateParameterSlots();
 
 	editorStateIdentifiers.add("SampleStartChainShown");
