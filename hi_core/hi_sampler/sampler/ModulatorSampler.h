@@ -34,9 +34,11 @@
 #ifndef MODULATORSAMPLER_H_INCLUDED
 #define MODULATORSAMPLER_H_INCLUDED
 
+
 namespace hise { using namespace juce;
 using namespace scriptnode;
 
+#include "../../hi_core/hi_core/SampleInterpolation.h"
 
 
 class SampleEditHandler;
@@ -60,8 +62,6 @@ class ModulatorSampler: public ModulatorSynth,
 {
 public:
 
-	// Elezeid's interpolation stuff - commenting now because idk if it'll work
-	#include "../../hi_core/hi_core/SampleInterpolation.h"
 	
 	SampleInterpolation getInterpolationMode() const noexcept { return interpolationMode; } //doesnt change anything and wont throw a billion errors
 	

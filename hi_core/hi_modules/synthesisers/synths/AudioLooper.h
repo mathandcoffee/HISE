@@ -101,6 +101,7 @@ public:
 		SNESGaussian,
 		Cubic,
 		PS1Gaussian,
+		GCPolyphase,
 		numInterpolationModes
 	};
 	enum SpecialParameters
@@ -112,10 +113,21 @@ public:
 		SampleStartMod,
 		Reversed,
 		InterpolationMode,
+		ResampleRate,
 		numLooperParameters
 	};
+	//public getters
 	SampleInterpolation getInterpolationMode() const noexcept { return interpolationMode; }
-
+	const AudioSampleBuffer* getResampledBuffer() const noexcept { return targetSampleRateIndex == 0 ? nullptr : &resampledBuffer; }
+	int getTargetSampleRateIndex() const noexcept { return targetSampleRateIndex; }
+	double getResampleRatio() const noexcept
+{
+    static const double sampleRates[] = { 0, 48000, 44100, 32000, 22050, 16000, 11025, 8000, 4000 };
+    if (targetSampleRateIndex == 0) return 1.0;
+    const double fileSampleRate = getSampleRateForLoadedFile();
+    if (fileSampleRate <= 0.0) return 1.0;
+    return sampleRates[targetSampleRateIndex] / fileSampleRate;
+}
 	AudioLooper(MainController *mc, const String &id, int numVoices);
 
 	~AudioLooper() override;
@@ -169,6 +181,9 @@ private:
 	bool pitchTrackingEnabled;
 	AudioLooper::SampleInterpolation interpolationMode = SampleInterpolation::NearestNeighbor;
 	int rootNote;
+	int targetSampleRateIndex = 0; // 0 = Native (no resampling)
+	AudioSampleBuffer resampledBuffer;
+	void rebuildResampledBuffer();
 
 	int sampleStartMod = 0;
 

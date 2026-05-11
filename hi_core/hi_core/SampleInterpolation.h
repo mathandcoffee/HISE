@@ -13,5 +13,6 @@ enum SampleInterpolation
     SNESGaussian,
     Cubic,
     PS1Gaussian,
+	GCPolyphase,
     numInterpolationModes
 };

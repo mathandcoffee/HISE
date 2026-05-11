@@ -833,7 +833,7 @@ template <typename SignalType, bool isFloat> void interpolateStereoSamples(const
 
 //interpolation modes chain
 const int p0 = jmax(0, pos - 1); //fixed bad declaration
-const int p3 = jmin(pos + 2, maxIndexInBuffer);
+const int p3 = jmin(pos + 2, maxIndexInBuffer - 1);
 auto l0 = (float)inL[p0];
 auto l3 = (float)inL[p3];
 auto r0 = (float)inR[p0];
@@ -876,16 +876,22 @@ else if (interpMode == Cubic)
 	+ (rs0 - 2.5f*r1 + 2.0f*r2 - 0.5f*rs3)*t*t
 	+ (-0.5f*rs0 + 0.5f*r2)*t + r1;
 }
-else
+else if (interpMode == PS1Gaussian)
 {
-	const int frac = jlimit(0, 255, (int)(alpha * 256.0f)); //safe boundaries because HISE wants to do bigger math than we need 
+	const int frac = jlimit(0, 255, (int)(alpha * 256.0f));
 	const float c0 = (float)GAUSS_TABLE_PS1[(0x0FF - frac) & 0x1FF];
 	const float c1 = (float)GAUSS_TABLE_PS1[(0x1FF - frac) & 0x1FF];
 	const float c2 = (float)GAUSS_TABLE_PS1[(0x100 + frac) & 0x1FF];
 	const float c3 = (float)GAUSS_TABLE_PS1[(0x000 + frac) & 0x1FF];
-	
     l = (c0*l0 + c1*l1 + c2*l2 + c3*l3) / 32768.0f;
     r = (c0*r0 + c1*r1 + c2*r2 + c3*r3) / 32768.0f;
+}
+else if (interpMode == GCPolyphase)
+{
+	const int phase = jlimit(0, 127, (int)(alpha * 128.0f));
+	const int16_t* c = &GC_POLYPHASE_COEFFS[phase * 4];
+	l = ((float)c[0]*l0 + (float)c[1]*l1 + (float)c[2]*l2 + (float)c[3]*l3) / 32768.0f;
+	r = ((float)c[0]*r0 + (float)c[1]*r1 + (float)c[2]*r2 + (float)c[3]*r3) / 32768.0f;
 }
 	
 	
@@ -935,7 +941,7 @@ else
 
 //interpolation stuff
 const int p0 = jmax(0, pos - 1); //fixed wrong declaration
-const int p3 = jmin(pos + 2, maxIndexInBuffer);
+const int p3 = jmin(pos + 2, maxIndexInBuffer - 1); //subtract 1 because it adds one 
 auto l0 = (float)inL[p0];
 auto l3 = (float)inL[p3];
 auto r0 = (float)inR[p0];
@@ -978,15 +984,22 @@ else if (interpMode == Cubic)
 	+ (rs0 - 2.5f*r1 + 2.0f*r2 - 0.5f*rs3)*t*t
 	+ (-0.5f*rs0 + 0.5f*r2)*t + r1;
 }
-else
+else if (interpMode == PS1Gaussian)
 {
-    const int frac = jlimit(0, 255, (int)(alpha * 256.0f)); //stop working so hard, it's just PS1
+	const int frac = jlimit(0, 255, (int)(alpha * 256.0f));
 	const float c0 = (float)GAUSS_TABLE_PS1[(0x0FF - frac) & 0x1FF];
 	const float c1 = (float)GAUSS_TABLE_PS1[(0x1FF - frac) & 0x1FF];
 	const float c2 = (float)GAUSS_TABLE_PS1[(0x100 + frac) & 0x1FF];
 	const float c3 = (float)GAUSS_TABLE_PS1[(0x000 + frac) & 0x1FF];
     l = (c0*l0 + c1*l1 + c2*l2 + c3*l3) / 32768.0f;
     r = (c0*r0 + c1*r1 + c2*r2 + c3*r3) / 32768.0f;
+}
+else if (interpMode == GCPolyphase)
+{
+	const int phase = jlimit(0, 127, (int)(alpha * 128.0f));
+	const int16_t* c = &GC_POLYPHASE_COEFFS[phase * 4];
+	l = ((float)c[0]*l0 + (float)c[1]*l1 + (float)c[2]*l2 + (float)c[3]*l3) / 32768.0f;
+	r = ((float)c[0]*r0 + (float)c[1]*r1 + (float)c[2]*r2 + (float)c[3]*r3) / 32768.0f;
 }
 
 			*outL++ = l * gainFactor;
@@ -1144,13 +1157,13 @@ void StreamingSamplerVoice::renderNextBlock(AudioSampleBuffer &outputBuffer, int
 		auto tempVoiceBuffer = getTemporaryVoiceBuffer();
 
 		jassert(tempVoiceBuffer != nullptr);
-		if (!isPositiveAndBelow(pitchCounter + startAlpha, (double)tempVoiceBuffer->getNumSamples()))
-		{
-			tempVoiceBuffer->setSize(tempVoiceBuffer->getNumChannels(), roundToInt((pitchCounter + startAlpha) * 1.5));
-		}
+		if (!isPositiveAndBelow(pitchCounter + startAlpha + 1.0, (double)tempVoiceBuffer->getNumSamples()))
+{
+		tempVoiceBuffer->setSize(tempVoiceBuffer->getNumChannels(), roundToInt((pitchCounter + startAlpha + 1.0) * 1.5)); //crackle fix
+}
 
-		// Copy the not resampled values into the voice buffer.
-		StereoChannelData data = loader.fillVoiceBuffer(*tempVoiceBuffer, pitchCounter + startAlpha);
+		// Copy the non-resampled values into the voice buffer.
+		StereoChannelData data = loader.fillVoiceBuffer(*tempVoiceBuffer, pitchCounter + startAlpha + 1.0); //crackle fix
 		
 		bool applyReleaseGainToFullBuffer = true;
 

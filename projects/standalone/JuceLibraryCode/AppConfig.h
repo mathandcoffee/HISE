@@ -43,42 +43,41 @@
 
 #define JUCE_USE_DARK_SPLASH_SCREEN 1
 
-#define JUCE_PROJUCER_VERSION 0x60104
+#define JUCE_PROJUCER_VERSION 0x60103
 
 //==============================================================================
-#define JUCE_MODULE_AVAILABLE_hi_backend                          1
-#define JUCE_MODULE_AVAILABLE_hi_core                             1
-#define JUCE_MODULE_AVAILABLE_hi_dsp_library                      1
-#define JUCE_MODULE_AVAILABLE_hi_faust                            1
-#define JUCE_MODULE_AVAILABLE_hi_faust_jit                        1
-#define JUCE_MODULE_AVAILABLE_hi_faust_lib                        1
-#define JUCE_MODULE_AVAILABLE_hi_faust_types                      1
-#define JUCE_MODULE_AVAILABLE_hi_lac                              1
-#define JUCE_MODULE_AVAILABLE_hi_loris                            1
-#define JUCE_MODULE_AVAILABLE_hi_rlottie                          1
-#define JUCE_MODULE_AVAILABLE_hi_scripting                        1
-#define JUCE_MODULE_AVAILABLE_hi_snex                             1
-#define JUCE_MODULE_AVAILABLE_hi_streaming                        1
-#define JUCE_MODULE_AVAILABLE_hi_tools                            1
-#define JUCE_MODULE_AVAILABLE_hi_zstd                             1
-#define JUCE_MODULE_AVAILABLE_juce_audio_basics                   1
-#define JUCE_MODULE_AVAILABLE_juce_audio_devices                  1
-#define JUCE_MODULE_AVAILABLE_juce_audio_formats                  1
-#define JUCE_MODULE_AVAILABLE_juce_audio_processors               1
-#define JUCE_MODULE_AVAILABLE_juce_audio_processors_headless      1
-#define JUCE_MODULE_AVAILABLE_juce_audio_utils                    1
-#define JUCE_MODULE_AVAILABLE_juce_core                           1
-#define JUCE_MODULE_AVAILABLE_juce_cryptography                   1
-#define JUCE_MODULE_AVAILABLE_juce_data_structures                1
-#define JUCE_MODULE_AVAILABLE_juce_dsp                            1
-#define JUCE_MODULE_AVAILABLE_juce_events                         1
-#define JUCE_MODULE_AVAILABLE_juce_graphics                       1
-#define JUCE_MODULE_AVAILABLE_juce_gui_basics                     1
-#define JUCE_MODULE_AVAILABLE_juce_gui_extra                      1
-#define JUCE_MODULE_AVAILABLE_juce_opengl                         1
-#define JUCE_MODULE_AVAILABLE_juce_osc                            1
-#define JUCE_MODULE_AVAILABLE_juce_product_unlocking              1
-#define JUCE_MODULE_AVAILABLE_melatonin_blur                      1
+#define JUCE_MODULE_AVAILABLE_hi_backend                  1
+#define JUCE_MODULE_AVAILABLE_hi_core                     1
+#define JUCE_MODULE_AVAILABLE_hi_dsp_library              1
+#define JUCE_MODULE_AVAILABLE_hi_faust                    1
+#define JUCE_MODULE_AVAILABLE_hi_faust_jit                1
+#define JUCE_MODULE_AVAILABLE_hi_faust_lib                1
+#define JUCE_MODULE_AVAILABLE_hi_faust_types              1
+#define JUCE_MODULE_AVAILABLE_hi_lac                      1
+#define JUCE_MODULE_AVAILABLE_hi_loris                    1
+#define JUCE_MODULE_AVAILABLE_hi_rlottie                  1
+#define JUCE_MODULE_AVAILABLE_hi_scripting                1
+#define JUCE_MODULE_AVAILABLE_hi_snex                     1
+#define JUCE_MODULE_AVAILABLE_hi_streaming                1
+#define JUCE_MODULE_AVAILABLE_hi_tools                    1
+#define JUCE_MODULE_AVAILABLE_hi_zstd                     1
+#define JUCE_MODULE_AVAILABLE_juce_audio_basics           1
+#define JUCE_MODULE_AVAILABLE_juce_audio_devices          1
+#define JUCE_MODULE_AVAILABLE_juce_audio_formats          1
+#define JUCE_MODULE_AVAILABLE_juce_audio_processors       1
+#define JUCE_MODULE_AVAILABLE_juce_audio_utils            1
+#define JUCE_MODULE_AVAILABLE_juce_core                   1
+#define JUCE_MODULE_AVAILABLE_juce_cryptography           1
+#define JUCE_MODULE_AVAILABLE_juce_data_structures        1
+#define JUCE_MODULE_AVAILABLE_juce_dsp                    1
+#define JUCE_MODULE_AVAILABLE_juce_events                 1
+#define JUCE_MODULE_AVAILABLE_juce_graphics               1
+#define JUCE_MODULE_AVAILABLE_juce_gui_basics             1
+#define JUCE_MODULE_AVAILABLE_juce_gui_extra              1
+#define JUCE_MODULE_AVAILABLE_juce_opengl                 1
+#define JUCE_MODULE_AVAILABLE_juce_osc                    1
+#define JUCE_MODULE_AVAILABLE_juce_product_unlocking      1
+#define JUCE_MODULE_AVAILABLE_melatonin_blur              1
 
 #define JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED 1
 
@@ -296,7 +295,7 @@
 // hi_dsp_library flags:
 
 #ifndef    HISE_INCLUDE_SCRIPTNODE_DATABASE
- //#define HISE_INCLUDE_SCRIPTNODE_DATABASE 0
+ //#define HISE_INCLUDE_SCRIPTNODE_DATABASE 1
 #endif
 
 #ifndef    HI_EXPORT_AS_PROJECT_DLL
@@ -458,6 +457,10 @@
  //#define HISE_INCLUDE_PITCH_DETECTION 1
 #endif
 
+#ifndef    HISE_INCLUDE_XSIMD
+ //#define HISE_INCLUDE_XSIMD 0
+#endif
+
 #ifndef    HISE_INCLUDE_RT_NEURAL
  //#define HISE_INCLUDE_RT_NEURAL 1
 #endif
@@ -557,13 +560,6 @@
 
 #ifndef    JUCE_CUSTOM_VST3_SDK
  //#define JUCE_CUSTOM_VST3_SDK 0
-#endif
-
-//==============================================================================
-// juce_audio_processors_headless flags:
-
-#ifndef    JUCE_RANDOM_SETTING_2000
- //#define JUCE_RANDOM_SETTING_2000 0
 #endif
 
 //==============================================================================

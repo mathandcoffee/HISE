@@ -62,7 +62,11 @@ void AudioLooperVoice::startNote(int midiNoteNumber, float /*velocity*/, Synthes
 
 	uptimeDelta = looper->getBuffer().isNotEmpty() ? 1.0 : 0.0;
 
-	const double resampleFactor = looper->getSampleRateForLoadedFile() / getSampleRate();
+	static const double sampleRates[] = { 0, 48000, 44100, 32000, 22050, 16000, 11025, 8000, 4000 };
+	const int srIndex = looper->getTargetSampleRateIndex();
+	const double fileSampleRate = looper->getSampleRateForLoadedFile();
+	const double effectiveSampleRate = (srIndex == 0 || fileSampleRate <= 0.0) ? fileSampleRate : sampleRates[srIndex];
+	const double resampleFactor = (effectiveSampleRate > 0.0 && getSampleRate() > 0.0) ? effectiveSampleRate / getSampleRate() : 1.0;
 
 	uptimeDelta *= resampleFactor;
     uptimeDelta *= looper->getMainController()->getGlobalPitchFactor();
@@ -124,8 +128,11 @@ void AudioLooperVoice::calculateBlock(int startSample, int numSamples)
 	SimpleReadWriteLock::ScopedReadLock sl(looper->getBuffer().getDataLock());
 	auto sampleRange = looper->getBuffer().getCurrentRange();
 
-	auto buffer = &looper->getAudioSampleBuffer();
-	auto length = sampleRange.getLength();
+	auto* resampled = looper->getResampledBuffer();
+	const bool usingResampled = resampled != nullptr && resampled->getNumSamples() > 0;
+	auto buffer = usingResampled ? resampled : &looper->getAudioSampleBuffer();
+
+	auto length = usingResampled ? (double)resampled->getNumSamples() : sampleRange.getLength();
 
 	const bool noBuffer = buffer->getNumChannels() == 0;
 	const bool sampleFinished = !looper->isUsingLoop() && (voiceUptime > length);
@@ -140,19 +147,24 @@ void AudioLooperVoice::calculateBlock(int startSample, int numSamples)
 		return;
 	}
 
-	int offset = sampleRange.getStart();
+	int offset = usingResampled ? 0 : sampleRange.getStart();
 
 	const float* leftSamples = buffer->getReadPointer(0, 0);
 	const float* rightSamples = buffer->getNumChannels() > 1 ? buffer->getReadPointer(1, 0) : leftSamples;
 
 	auto loopRange = looper->getBuffer().getLoopRange();
 
-	int loopStart = jmax<int>(offset, loopRange.getStart());
-	int loopEnd = jmin<int>(loopRange.getEnd(), sampleRange.getEnd());
+	const double resampleRatio = looper->getResampleRatio();
+	int loopStart = usingResampled
+		? jmax<int>(0, (int)(loopRange.getStart() * resampleRatio))
+		: jmax<int>(offset, loopRange.getStart());
+	int loopEnd = usingResampled
+		? jmin<int>(buffer->getNumSamples() - 1, (int)(loopRange.getEnd() * resampleRatio))
+		: jmin<int>(loopRange.getEnd(), sampleRange.getEnd());
 
 	length = looper->isUsingLoop() ? loopEnd - loopStart : length;
 
-	auto end = sampleRange.getLength() - 1;
+	auto end = usingResampled ? (double)(buffer->getNumSamples() - 1) : (double)(sampleRange.getLength() - 1);
 
 	auto loopOffset = jmax<int>(0, loopStart - offset);
 
@@ -343,7 +355,24 @@ void AudioLooperVoice::calculateBlock(int startSample, int numSamples)
 				rightSample = (c0 * rightSamples[p0] + c1 * rightSamples[p1]
                  + c2 * rightSamples[p2] + c3 * rightSamples[p3]) / 32768.0f;
 			}
-			
+			else if (looper->getInterpolationMode() == AudioLooper::SampleInterpolation::GCPolyphase)
+			{
+				// Select phase from fractional position (128 phases)
+				const int phase = (int)(alpha * 128.0) & 127;
+				const int16_t* c = &GC_POLYPHASE_COEFFS[phase * 4];
+
+				// 4 surrounding sample positions
+				const int p0 = jlimit(0, buffer->getNumSamples() - 1, samplePos - 1);
+				const int p1 = jlimit(0, buffer->getNumSamples() - 1, samplePos);
+				const int p2 = jlimit(0, buffer->getNumSamples() - 1, nextSamplePos);
+				const int p3 = jlimit(0, buffer->getNumSamples() - 1, nextSamplePos + 1);
+
+				// 4-tap FIR dot product, scaled from Q1.15
+				leftSample  = ((float)c[0] * leftSamples[p0]  + (float)c[1] * leftSamples[p1]
+				             + (float)c[2] * leftSamples[p2]  + (float)c[3] * leftSamples[p3]) / 32768.0f;
+				rightSample = ((float)c[0] * rightSamples[p0] + (float)c[1] * rightSamples[p1]
+				             + (float)c[2] * rightSamples[p2] + (float)c[3] * rightSamples[p3]) / 32768.0f;
+			}
 			//const float currentSample = invAlpha * v1 + alpha * v2;
 
 			// Stereo mode assumed
@@ -440,6 +469,16 @@ hise::ProcessorMetadata AudioLooper::createMetadata()
 			.withDescription("Reverses the playback direction of the audio file")
 			.asToggle()
 			.withDefault(0.0f))
+	.withParameter(Par(InterpolationMode)
+			.withId("InterpolationMode")
+			.withDescription("Sample interpolation algorithm")
+			.withValueList({ "NearestNeighbor", "Linear", "SNESGaussian", "Cubic", "PS1Gaussian", "GCPolyphase" })
+			.withDefault(2.0f))
+	.withParameter(Par(ResampleRate)
+			.withId("ResampleRate")
+			.withDescription("Resamples the audio buffer to a lower sample rate before interpolation, for lo-fi character")
+			.withValueList({ "Native", "48000", "44100", "32000", "22050", "16000", "11025", "8000", "4000" })
+			.withDefault(1.0f))
 		;
 }
 
@@ -483,6 +522,7 @@ void AudioLooper::restoreFromValueTree(const ValueTree &v)
 	loadAttribute(SampleStartMod, "SampleStartMod");
 	loadAttribute(Reversed, "Reversed");
 	loadAttribute(InterpolationMode, "InterpolationMode");
+	loadAttribute(ResampleRate, "ResampleRate");
 }
 
 ValueTree AudioLooper::exportAsValueTree() const
@@ -496,6 +536,7 @@ ValueTree AudioLooper::exportAsValueTree() const
 	saveAttribute(SampleStartMod, "SampleStartMod");
 	saveAttribute(Reversed, "Reversed");
 	saveAttribute(InterpolationMode, "InterpolationMode");
+	saveAttribute(ResampleRate, "ResampleRate");
 
 	AudioSampleProcessor::saveToValueTree(v);
 
@@ -515,6 +556,7 @@ float AudioLooper::getAttribute(int parameterIndex) const
 	case SampleStartMod: return (float)sampleStartMod;
 	case Reversed:		return reversed ? 1.0f : 0.0f;
 	case InterpolationMode:	return (float)((int)interpolationMode + 1);
+	case ResampleRate: return (float)(targetSampleRateIndex + 1);
 	default:					jassertfalse; return -1.0f;
 	}
 }
@@ -535,6 +577,11 @@ void AudioLooper::setInternalAttribute(int parameterIndex, float newValue)
 	case RootNote:		rootNote = (int)newValue; break;
 	case PitchTracking:	pitchTrackingEnabled = newValue > 0.5f; break;
 	case SampleStartMod: sampleStartMod = jmax<int>(0, (int)newValue); break;
+	case ResampleRate:
+		targetSampleRateIndex = (int)newValue - 1;
+		allNotesOff(1, true);
+		rebuildResampledBuffer();
+		break;
 	case Reversed:		reversed = newValue > 0.5f; break;
 	case InterpolationMode:	interpolationMode = (SampleInterpolation)((int)newValue - 1); break;
 	default:			jassertfalse; break;
@@ -591,13 +638,53 @@ void AudioLooper::bufferWasLoaded()
 		}
 	}
 
-	
-	
+	rebuildResampledBuffer();
 }
 
 void AudioLooper::bufferWasModified()
 {
 	
+}
+
+void AudioLooper::rebuildResampledBuffer()
+{
+    static const double sampleRates[] = { 0, 48000, 44100, 32000, 22050, 16000, 11025, 8000, 4000 };
+
+    if (targetSampleRateIndex == 0)
+    {
+        resampledBuffer.setSize(0, 0);
+        return;
+    }
+
+    SimpleReadWriteLock::ScopedReadLock sl(getBuffer().getDataLock());
+    auto& original = getAudioSampleBuffer();
+
+    if (original.getNumSamples() == 0 || original.getNumChannels() == 0)
+        return;
+
+    const double sourceSampleRate = getSampleRateForLoadedFile();
+    const double targetSampleRate = sampleRates[targetSampleRateIndex];
+
+    if (sourceSampleRate <= 0.0 || targetSampleRate <= 0.0)
+        return;
+
+    const double ratio = targetSampleRate / sourceSampleRate;
+    const int numChannels = original.getNumChannels();
+    const int numOutputSamples = jmax(1, (int)(original.getNumSamples() * ratio));
+
+    resampledBuffer.setSize(numChannels, numOutputSamples, false, true, false);
+
+    for (int ch = 0; ch < numChannels; ch++)
+    {
+        LagrangeInterpolator interpolator;
+        interpolator.reset();
+        interpolator.process(1.0 / ratio,
+                             original.getReadPointer(ch),
+                             resampledBuffer.getWritePointer(ch),
+                             numOutputSamples,
+                             original.getNumSamples(),
+                             0);
+    }
 }
 
 ProcessorEditorBody* AudioLooper::createEditor(ProcessorEditor *parentEditor)
