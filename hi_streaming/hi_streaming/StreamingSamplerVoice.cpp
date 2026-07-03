@@ -864,11 +864,9 @@ else if (interpMode == SNESGaussian)
 }
 else if (interpMode == Cubic)
 { //had to put another type of Cubic here because HISE's only works on compile rather than stream
-    const int p0 = jmax(0, pos - 1);
-	const int p3 = jmin(pos + 2, maxIndexInBuffer);
 	const float t = alpha;
-	const float ls0 = (float)inL[p0], ls3 = (float)inL[p3];
-	const float rs0 = (float)inR[p0], rs3 = (float)inR[p3];
+	const float ls0 = l0, ls3 = l3;
+	const float rs0 = r0, rs3 = r3;
 	l = (-0.5f*ls0 + 1.5f*l1 - 1.5f*l2 + 0.5f*ls3)*t*t*t
 	+ (ls0 - 2.5f*l1 + 2.0f*l2 - 0.5f*ls3)*t*t
 	+ (-0.5f*ls0 + 0.5f*l2)*t + l1;
@@ -972,11 +970,9 @@ else if (interpMode == SNESGaussian)
 }
 else if (interpMode == Cubic)
 { //again, using sourced math because HISE can only do Cubic on compile rather than LIVE!
-    const int p0 = jmax(0, pos - 1);
-	const int p3 = jmin(pos + 2, maxIndexInBuffer);
 	const float t = alpha;
-	const float ls0 = (float)inL[p0], ls3 = (float)inL[p3];
-	const float rs0 = (float)inR[p0], rs3 = (float)inR[p3];
+	const float ls0 = l0, ls3 = l3;
+	const float rs0 = r0, rs3 = r3;
 	l = (-0.5f*ls0 + 1.5f*l1 - 1.5f*l2 + 0.5f*ls3)*t*t*t
 	+ (ls0 - 2.5f*l1 + 2.0f*l2 - 0.5f*ls3)*t*t
 	+ (-0.5f*ls0 + 0.5f*l2)*t + l1;
@@ -1015,25 +1011,30 @@ else if (interpMode == GCPolyphase)
 
 void StreamingSamplerVoice::interpolateFromStereoData(int startSample, float* outL, float* outR, int numSamplesToCalculate, const float* pitchDataToUse, double thisUptimeDelta, const double startAlpha, StereoChannelData data, int samplesAvailable)
 {
-	double indexInBuffer = startAlpha;
+	// 4-tap modes need one sample of history for the pos-1 tap.
+	// Shift the read pointer back one sample and the index forward one,
+	// so inL[pos - 1] is the true previous sample instead of a duplicate. - sfg
+	const int hist = (data.offsetInBuffer > 0) ? 1 : 0;
+
+	double indexInBuffer = startAlpha + (double)hist;
 
 	if (data.b->isFloatingPoint())
 	{
-		const float* const inL = static_cast<const float*>(data.b->getReadPointer(0, data.offsetInBuffer));
-		const float* const inR = static_cast<const float*>(data.b->getReadPointer(1, data.offsetInBuffer));
+		const float* const inL = static_cast<const float*>(data.b->getReadPointer(0, data.offsetInBuffer - hist));
+		const float* const inR = static_cast<const float*>(data.b->getReadPointer(1, data.offsetInBuffer - hist));
 
-		interpolateStereoSamples<float, true>(inL, inR, pitchDataToUse, outL, outR, startSample, indexInBuffer, thisUptimeDelta, numSamplesToCalculate, indexInBuffer + samplesAvailable, interpolationMode); //interpolation added
+		interpolateStereoSamples<float, true>(inL, inR, pitchDataToUse, outL, outR, startSample, indexInBuffer, thisUptimeDelta, numSamplesToCalculate, (int)indexInBuffer + samplesAvailable, interpolationMode); //interpolation added
 	}
 	else
 	{
-		const int16* const inL = static_cast<const int16*>(data.b->getReadPointer(0, data.offsetInBuffer));
-		const int16* const inR = static_cast<const int16*>(data.b->getReadPointer(1, data.offsetInBuffer));
+		const int16* const inL = static_cast<const int16*>(data.b->getReadPointer(0, data.offsetInBuffer - hist));
+		const int16* const inR = static_cast<const int16*>(data.b->getReadPointer(1, data.offsetInBuffer - hist));
 
 		bool useNormalisation = data.b->usesNormalisation();
 
 		if (useNormalisation)
 		{
-			const int numSamplesThisTime = (int)(ceil)((pitchCounter + startAlpha)) + 1;
+			const int numSamplesThisTime = (int)(ceil)((pitchCounter + startAlpha)) + 2 + hist; //4-tap needs pos+2, plus history
 
 			float* inL_f = (float*)alloca(sizeof(float) * numSamplesThisTime);
 			float* d[2] = { inL_f, nullptr };
@@ -1044,22 +1045,22 @@ void StreamingSamplerVoice::interpolateFromStereoData(int startSample, float* ou
 
 				d[1] = inR_f;
 
-				data.b->convertToFloatWithNormalisation(d, data.b->getNumChannels(), data.offsetInBuffer, numSamplesThisTime);
+				data.b->convertToFloatWithNormalisation(d, data.b->getNumChannels(), data.offsetInBuffer - hist, numSamplesThisTime);
 
-				interpolateStereoSamples<float, true>(inL_f, inR_f, pitchDataToUse, outL, outR, startSample, indexInBuffer, thisUptimeDelta, numSamplesToCalculate, indexInBuffer + samplesAvailable, interpolationMode); //interpolation added
+				interpolateStereoSamples<float, true>(inL_f, inR_f, pitchDataToUse, outL, outR, startSample, indexInBuffer, thisUptimeDelta, numSamplesToCalculate, (int)indexInBuffer + samplesAvailable, interpolationMode); //interpolation added
 			}
 			else
 			{
-				data.b->convertToFloatWithNormalisation(d, 1, data.offsetInBuffer, numSamplesThisTime);
+				data.b->convertToFloatWithNormalisation(d, 1, data.offsetInBuffer - hist, numSamplesThisTime);
 
-				interpolateMonoSamples<float, true>(inL_f, nullptr, pitchDataToUse, outL, nullptr, startSample, indexInBuffer, thisUptimeDelta, numSamplesToCalculate);
+				interpolateMonoSamples<float, true>(inL_f + hist, nullptr, pitchDataToUse, outL, nullptr, startSample, startAlpha, thisUptimeDelta, numSamplesToCalculate);
 
 				memcpy(outR, outL, sizeof(float) * numSamplesToCalculate);
 			}
 		}
 		else
 		{
-			interpolateStereoSamples<int16, false>(inL, inR, pitchData, outL, outR, startSample, indexInBuffer, thisUptimeDelta, numSamplesToCalculate, indexInBuffer + samplesAvailable, interpolationMode);
+			interpolateStereoSamples<int16, false>(inL, inR, pitchData, outL, outR, startSample, indexInBuffer, thisUptimeDelta, numSamplesToCalculate, (int)indexInBuffer + samplesAvailable, interpolationMode);
 		}
 	}
 }
@@ -1157,13 +1158,13 @@ void StreamingSamplerVoice::renderNextBlock(AudioSampleBuffer &outputBuffer, int
 		auto tempVoiceBuffer = getTemporaryVoiceBuffer();
 
 		jassert(tempVoiceBuffer != nullptr);
-		if (!isPositiveAndBelow(pitchCounter + startAlpha + 1.0, (double)tempVoiceBuffer->getNumSamples()))
+		if (!isPositiveAndBelow(pitchCounter + startAlpha + 2.0, (double)tempVoiceBuffer->getNumSamples()))
 {
-		tempVoiceBuffer->setSize(tempVoiceBuffer->getNumChannels(), roundToInt((pitchCounter + startAlpha + 1.0) * 1.5)); //crackle fix
+		tempVoiceBuffer->setSize(tempVoiceBuffer->getNumChannels(), roundToInt((pitchCounter + startAlpha + 2.0) * 1.5)); //crackle fix
 }
 
 		// Copy the non-resampled values into the voice buffer.
-		StereoChannelData data = loader.fillVoiceBuffer(*tempVoiceBuffer, pitchCounter + startAlpha + 1.0); //crackle fix
+		StereoChannelData data = loader.fillVoiceBuffer(*tempVoiceBuffer, pitchCounter + startAlpha + 2.0); //crackle fix, +2 for 4-tap guardrails
 		
 		bool applyReleaseGainToFullBuffer = true;
 

@@ -75,6 +75,14 @@ CustomKeyboard::CustomKeyboard(MainController* mc_) :
 {
 	setKeyPressBaseOctave(currentKeyboardOctave);
 
+#if !USE_BACKEND
+	// Fix stuck-note bug in compiled plugins: a held QWERTY key whose key-up is lost on focus change (alt-tab, reopening the plugin window) latches a note
+	// at the OS key-state level (always F5 = the 'f' key at base octave 5).
+	// Removing keyboard focus disables computer-keyboard note input, the only
+	// path that can get stuck. Clicking the on-screen keys is unaffected.
+	setWantsKeyboardFocus(false);
+#endif
+
 	state->addChangeListener(this);
    
 	setColour(whiteNoteColourId, Colours::black);
